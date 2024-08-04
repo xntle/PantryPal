@@ -1,43 +1,10 @@
-'use client';
+'use client'
 
 import { useState, useEffect } from 'react';
 import { firestore } from '@/firebase';
 import { Box, Modal, Typography, Stack, TextField, Button, Container, Paper, Grid } from '@mui/material';
 import { collection, deleteDoc, query, getDocs, getDoc, doc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/firebase';
-
-// Placeholder AI chat component
-function AIChatBox() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
-
-  const handleSend = () => {
-    if (input.trim()) {
-      setMessages([...messages, { role: 'user', content: input }]);
-      setInput('');
-      // Simulate AI response
-      setTimeout(() => {
-        setMessages((prevMessages) => [
-          ...prevMessages,
-          { role: 'ai', content: 'This is a simulated response from AI.' },
-        ]);
-      }, 1000);
-    }
-  };
-
-  return (
-    <Paper elevation={3} sx={{ p: 2, mt: 2, borderRadius: '12px', bgcolor: '#2C2F33' }}>
-      <Typography variant="h6" sx={{ fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }} gutterBottom>
-        Recipe Recommendation
-      </Typography>
-      <Typography variant="p" sx={{ fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }} gutterBottom>
-        With these items, you can make sum spwagetti :-)
-      </Typography>
-
-    </Paper>
-  );
-}
+import RecipeBox from './RecipeBox'; 
 
 export default function Home() {
   const [inventory, setInventory] = useState([]);
@@ -129,7 +96,7 @@ export default function Home() {
               </Button>
             </Paper>
 
-            <AIChatBox />
+            <RecipeBox inventory={inventory} />
 
             <Modal open={open} onClose={handleClose}>
               <Box
@@ -172,34 +139,6 @@ export default function Home() {
                       },
                     }}
                   />
-                  <Button
-                    variant="contained"
-                    component="label"
-                    sx={{ bgcolor: '#7289DA', color: '#ffffff', borderRadius: '12px', fontFamily: '"Helvetica", "Arial", sans-serif' }}
-                  >
-                    Take Picture
-                    <input
-                      type="file"
-                      hidden
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleImageChange}
-                    />
-                  </Button>
-                  {imagePreview && (
-                    <Box mt={2} display="flex" justifyContent="center">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        style={{
-                          width: '100px',
-                          height: '100px',
-                          objectFit: 'cover',
-                          borderRadius: '8px',
-                        }}
-                      />
-                    </Box>
-                  )}
                   <Button
                     variant="contained"
                     onClick={() => {

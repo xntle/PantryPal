@@ -12,6 +12,7 @@ export default function Home() {
   const [itemName, setItemName] = useState('');
   const [itemImage, setItemImage] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
+  
 
   const updateInventory = async () => {
     const inventoryCollection = query(collection(firestore, 'inventory'));
@@ -231,3 +232,5 @@ export default function Home() {
     </Box>
   );
 }
+
+export const dynamic = 'force-dynamic'

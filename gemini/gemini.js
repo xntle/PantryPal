@@ -4,7 +4,6 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 
 const apiKey = process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
-console.log('pAPI Key:', process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET); // Verify the value is loaded correctly
 
 
 // Initialize the Google Generative AI with the API key

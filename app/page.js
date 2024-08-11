@@ -1,131 +1,236 @@
 'use client'
 
-import { Box, Button, Stack, TextField } from '@mui/material';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { firestore } from '@/firebase';
+import { Box, Modal, Typography, Stack, TextField, Button, Container, Paper, Grid } from '@mui/material';
+import { collection, deleteDoc, query, getDocs, getDoc, doc, setDoc } from 'firebase/firestore';
+import RecipeBox from './RecipeBox'; 
 
-export default function Page() {
-  const [messages, setMessages] = useState([
-    {
-      role: 'assistant',
-      content: `Hello! I'm an AI-powered customer support assistant for Amazon. How can I help you today?`,
-    }
-  ]);
+export default function Home() {
+  const [inventory, setInventory] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [itemName, setItemName] = useState('');
+  const [itemImage, setItemImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState('');
+  
 
-  const [message, setMessage] = useState(''); 
+  const updateInventory = async () => {
+    const inventoryCollection = query(collection(firestore, 'inventory'));
+    const snapshot = await getDocs(inventoryCollection);
+    const inventoryList = snapshot.docs.map(doc => ({
+      name: doc.id,
+      ...doc.data(),
+    }));
+    setInventory(inventoryList);
+  };
 
-  const sendMessage = async () => {
-    // Clear the input field
-    setMessage('');
+  const handleItemAction = async (item, imageFile, action) => {
+    const docRef = doc(firestore, 'inventory', item);
+    const docSnap = await getDoc(docRef);
 
-    // Add the user's message and a placeholder for the assistant's response
-    setMessages((prevMessages) => [
-      ...prevMessages,
-      {
-        role: 'user',
-        content: message,
-      },
-      {
-        role: 'assistant',
-        content: '',
-      },
-    ]);
-    
-
-    // Send the message to the API
-    const response = fetch('/api/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: message,
-      })
-    }).then(async (res) => {
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-
-      let result = '';
-      return reader.read().then(function processText({ done, value }) {
-        if (done) {
-          return result;
+    if (docSnap.exists()) {
+      const { count } = docSnap.data();
+      if (action === 'remove') {
+        if (count === 1) {
+          await deleteDoc(docRef);
+        } else {
+          await setDoc(docRef, { count: count - 1 }, { merge: true });
         }
-        const text = decoder.decode(value || new Int8Array(), { 
-          stream: true 
-        });
-        setMessages((prevMessages) => {
-          let lastMessage = prevMessages[prevMessages.length - 1];
-          let otherMessages = prevMessages.slice(0, -1);
+      } else {
+        await setDoc(docRef, { count: count + 1 }, { merge: true });
+      }
+    } else if (action === 'add') {
+      let imageUrl = '';
+      if (imageFile) {
+        const storageRef = ref(storage, `images/${item}-${Date.now()}`);
+        await uploadBytes(storageRef, imageFile);
+        imageUrl = await getDownloadURL(storageRef);
+      }
+      await setDoc(docRef, { count: 1, imageUrl });
+    }
 
-          return [
-            ...otherMessages,
-            {
-              ...lastMessage,
-              content: lastMessage.content + text,
-            }
-          ];
-        });
-        return reader.read().then(processText);
-      });
-    }).catch(error => {
-      console.error("Error reading response:", error);
-    });
-  }
+    updateInventory();
+  };
+
+  useEffect(() => {
+    updateInventory();
+  }, []);
+
+  const handleOpen = () => setOpen(true);
+  const handleClose = () => {
+    setOpen(false);
+    setItemName('');
+    setItemImage(null);
+    setImagePreview('');
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setItemImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
 
   return (
-    <Box 
-      width="100vw" 
-      height="100vh" 
-      display="flex" 
-      flexDirection="column" 
-      justifyContent="center" 
-      alignItems="center"
-    >
-      <Stack 
-        direction="column" 
-        width="600px" 
-        height="700px" 
-        border="1px solid black" 
-        p={2} 
-        spacing={3}
-        overflow="auto"
-        maxHeight="100%"
-      >
-        {
-          messages.map((message, index) => (
-            <Box 
-              key={index} 
-              display="flex" 
-              justifyContent={
-                message.role === 'assistant' ? 'flex-start' : 'flex-end'
-              }
-            >
-              <Box 
-                bgcolor={
-                  message.role === 'assistant' 
-                  ? 'primary.main' 
-                  : 'secondary.main'
-                }
-                color="white"
-                borderRadius={16}
-                p={3}
+    <Box sx={{ bgcolor: '#23272A', minHeight: '100vh', padding: 4 }}>
+      <Container maxWidth="lg">
+        <Typography variant="h3" sx={{ textAlign: 'center', mb: 2, fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }} gutterBottom>
+          Pantry Pal AI
+        </Typography>
+        <Typography variant="h6" sx={{ textAlign: 'center', mb: 2, fontFamily: '"Helvetica", "Arial", sans-serif', color: '#99AAB5' }} gutterBottom>
+          Hi! Add any items to get started! :-)
+        </Typography>
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 4, textAlign: 'center', borderRadius: '12px', bgcolor: '#2C2F33' }}>
+              <Typography variant="h5" gutterBottom sx={{ fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }}>
+                Add Item
+              </Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleOpen}
+                sx={{ bgcolor: '#7289DA', color: '#ffffff', borderRadius: '12px', mt: 2, fontFamily: '"Helvetica", "Arial", sans-serif' }}
               >
-                {message.content} {/* Make sure to access the content property */}
+                Add New Item
+              </Button>
+            </Paper>
+
+            <RecipeBox inventory={inventory} />
+
+            <Modal open={open} onClose={handleClose}>
+              <Box
+                position="absolute"
+                top="50%"
+                left="50%"
+                width={400}
+                bgcolor="#2C2F33"
+                borderRadius="12px"
+                boxShadow={24}
+                p={4}
+                sx={{ transform: 'translate(-50%, -50%)' }}
+              >
+                <Typography variant="h6" gutterBottom sx={{ fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }}>
+                  Add Item
+                </Typography>
+                <Stack width="100%" direction="column" spacing={2}>
+                  <TextField
+                    label="Item Name"
+                    variant="outlined"
+                    fullWidth
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    sx={{
+                      fontFamily: '"Helvetica", "Arial", sans-serif',
+                      bgcolor: '#23272A',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      input: { color: '#ffffff' },
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: '#7289DA',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#99AAB5',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#7289DA',
+                        },
+                      },
+                    }}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={() => {
+                      handleItemAction(itemName, itemImage, 'add');
+                      handleClose();
+                    }}
+                    sx={{ bgcolor: '#7289DA', color: '#ffffff', borderRadius: '12px', fontFamily: '"Helvetica", "Arial", sans-serif' }}
+                  >
+                    Add
+                  </Button>
+                </Stack>
               </Box>
-            </Box>
-          ))
-        }
-        <Stack direction="row" spacing={2}>
-          <TextField
-            label="Message"
-            fullWidth
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-          />
-          <Button variant='contained' onClick={sendMessage}>
-            Send
-          </Button>
-        </Stack>
-      </Stack>
+            </Modal>
+          </Grid>
+
+          <Grid item xs={12} md={6}>
+            <Paper elevation={3} sx={{ p: 2, borderRadius: '12px', bgcolor: '#2C2F33' }}>
+              <Box
+                width="100%"
+                bgcolor="#23272A"
+                color="#ffffff"
+                py={2}
+                display="flex"
+                justifyContent="center"
+                alignItems="center"
+                sx={{ borderRadius: '8px' }}
+              >
+                <Typography variant="h5" sx={{ fontFamily: '"Helvetica", "Arial", sans-serif', color: '#ffffff' }}>
+                  Inventory Items
+                </Typography>
+              </Box>
+              <Stack direction="column" spacing={2} mt={2}>
+                {inventory.map(({ name, count, imageUrl }) => (
+                  <Paper
+                    key={name}
+                    elevation={1}
+                    sx={{
+                      p: 2,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderRadius: '8px',
+                      bgcolor: '#2C2F33',
+                    }}
+                  >
+                    <Box display="flex" alignItems="center">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={name}
+                          style={{
+                            width: '50px',
+                            height: '50px',
+                            objectFit: 'cover',
+                            borderRadius: '8px',
+                            marginRight: '16px',
+                          }}
+                        />
+                      )}
+                      <Typography variant="h6" color="#ffffff" sx={{ fontFamily: '"Helvetica", "Arial", sans-serif' }}>
+                        {name.charAt(0).toUpperCase() + name.slice(1)}
+                      </Typography>
+                    </Box>
+                    <Typography variant="h6" color="#99AAB5" sx={{ fontFamily: '"Helvetica", "Arial", sans-serif' }}>
+                      Quantity: {count}
+                    </Typography>
+                    <Stack direction="row" spacing={2}>
+                      <Button
+                        variant="outlined"
+                        onClick={() => handleItemAction(name, null, 'add')}
+                        sx={{ bgcolor: '#7289DA', color: '#ffffff', borderRadius: '12px', fontFamily: '"Helvetica", "Arial", sans-serif' }}
+                      >
+                        Add
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        onClick={() => handleItemAction(name, null, 'remove')}
+                        sx={{ bgcolor: '#7289DA', color: '#ffffff', borderRadius: '12px', fontFamily: '"Helvetica", "Arial", sans-serif' }}
+                      >
+                        Remove
+                      </Button>
+                    </Stack>
+                  </Paper>
+                ))}
+              </Stack>
+            </Paper>
+          </Grid>
+        </Grid>
+      </Container>
     </Box>
   );
 }
+
+export const dynamic = 'force-dynamic'
